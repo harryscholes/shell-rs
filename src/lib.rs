@@ -8,6 +8,6 @@ pub mod pipeline;
 #[macro_export]
 macro_rules! input {
     ($token:expr) => {
-        crate::grammar::Token::Input($token.to_string())
+        $crate::grammar::Token::Input($token.to_string())
     };
 }

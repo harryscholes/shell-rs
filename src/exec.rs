@@ -134,7 +134,7 @@ mod tests {
         let path = dir.path().join("output.txt");
         File::create(&path)
             .unwrap()
-            .write("foo\n".as_bytes())
+            .write_all("foo\n".as_bytes())
             .unwrap();
 
         let left = Ast::Command {

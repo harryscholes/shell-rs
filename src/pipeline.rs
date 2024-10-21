@@ -39,7 +39,7 @@ mod tests {
         let path = dir.path().join("output.txt");
         File::create(&path)
             .unwrap()
-            .write("foo\n".as_bytes())
+            .write_all("foo\n".as_bytes())
             .unwrap();
         let input = format!("echo bar >> {}", path.to_str().unwrap());
         let status = Pipeline::run(&input).unwrap();
