@@ -9,4 +9,6 @@ pub enum Ast {
     And { left: Box<Ast>, right: Box<Ast> },
     Or { left: Box<Ast>, right: Box<Ast> },
     Sequence { left: Box<Ast>, right: Box<Ast> },
+    Subshell { inner: Box<Ast> },
+    Empty,
 }

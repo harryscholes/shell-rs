@@ -69,4 +69,22 @@ mod tests {
             .unwrap();
         assert_eq!(&result, "foo\n");
     }
+
+    // #[test]
+    // fn test_nested_subshells() {
+    //     let dir = TempDir::new("").unwrap();
+    //     let path = dir.path().join("output.txt");
+    //     let input = format!(
+    //         "((( echo foo | cat ) | cat ) | cat ) | cat > {}",
+    //         path.to_str().unwrap()
+    //     );
+    //     let status = Pipeline::run(&input).unwrap();
+    //     assert!(status.success());
+    //     let mut result = String::new();
+    //     File::open(&path)
+    //         .unwrap()
+    //         .read_to_string(&mut result)
+    //         .unwrap();
+    //     assert_eq!(&result, "foo\n");
+    // }
 }

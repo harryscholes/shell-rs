@@ -19,6 +19,8 @@ fn exec_impl(ast: &Ast, stdin: Option<Stdio>, stdout: Option<Stdio>) -> io::Resu
         Ast::And { left, right } => exec_and(left, right, stdout),
         Ast::Or { left, right } => exec_or(left, right, stdout),
         Ast::Sequence { left, right } => exec_sequence(left, right, stdout),
+        Ast::Subshell { inner } => exec_impl(inner, stdin, stdout),
+        Ast::Empty => Ok(Command::new("true").spawn()?),
     }
 }
 
@@ -252,6 +254,26 @@ mod tests {
         let child = exec_sequence(&left, &right, Some(stdout)).unwrap();
         let output = child.wait_with_output().unwrap();
         assert_eq!(std::str::from_utf8(&output.stdout).unwrap(), "bar\n");
+    }
+
+    #[test]
+    fn test_exec_impl_subshells() {
+        let ast = Ast::Subshell {
+            inner: Box::new(Ast::Subshell {
+                inner: Box::new(Ast::Subshell {
+                    inner: Box::new(Ast::Subshell {
+                        inner: Box::new(Ast::Command {
+                            command: input!("echo"),
+                            args: vec![input!("foo")],
+                        }),
+                    }),
+                }),
+            }),
+        };
+        let stdout = Stdio::piped();
+        let child = exec_impl(&ast, None, Some(stdout)).unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert_eq!(std::str::from_utf8(&output.stdout).unwrap(), "foo\n");
     }
 
     #[test]

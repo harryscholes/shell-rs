@@ -11,8 +11,9 @@ pub enum Token {
     And,
     Or,
     End,
+    OpenParenthesis,
+    CloseParenthesis,
     // TODO:
-    // - Subshell
     // - Variable
 }
 
@@ -28,6 +29,8 @@ impl AsRef<OsStr> for Token {
             Token::Or => "||".as_ref(),
             Token::Background => "&".as_ref(),
             Token::End => ";".as_ref(),
+            Token::OpenParenthesis => "(".as_ref(),
+            Token::CloseParenthesis => ")".as_ref(),
         }
     }
 }

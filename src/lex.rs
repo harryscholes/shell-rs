@@ -92,6 +92,16 @@ impl Lexer {
                     tokens.push(input!(std::mem::take(&mut token)));
                 }
                 tokens.push(Token::RedirectIn);
+            } else if c == '(' && !in_single_quotes && !in_double_quotes {
+                if !token.is_empty() {
+                    tokens.push(input!(std::mem::take(&mut token)));
+                }
+                tokens.push(Token::OpenParenthesis);
+            } else if c == ')' && !in_single_quotes && !in_double_quotes {
+                if !token.is_empty() {
+                    tokens.push(input!(std::mem::take(&mut token)));
+                }
+                tokens.push(Token::CloseParenthesis);
             } else {
                 token.push(c);
             }

@@ -11,7 +11,7 @@ fn main() {
 
         io::stdin().lock().read_line(&mut line).unwrap();
 
-        if let Err(e) = Pipeline::run(&line) {
+        if let Err(e) = Pipeline::run(line.trim()) {
             eprintln!("Error: {}", e);
         }
 
