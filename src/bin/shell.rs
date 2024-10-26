@@ -1,9 +1,6 @@
-use std::{
-    f32::consts::E,
-    io::{self, BufRead, Write},
-};
+use std::io::{self, BufRead, Write};
 
-use shell::pipeline::Pipeline;
+use shell::{exec::RunningProcess, pipeline::Pipeline};
 
 fn main() {
     let mut line = String::new();
@@ -15,11 +12,18 @@ fn main() {
         io::stdin().lock().read_line(&mut line).unwrap();
 
         match Pipeline::run(line.trim()) {
-            Ok(status) => {
-                if !status.success() {
-                    eprintln!("Exit status code: {:?}", status.code());
+            Ok(p) => match p {
+                RunningProcess::Foreground(status) => {
+                    if !status.success() {
+                        if let Some(code) = status.code() {
+                            eprintln!("Error: {}", code);
+                        }
+                    }
                 }
-            }
+                RunningProcess::Background => {
+                    println!("Background process started");
+                }
+            },
             Err(e) => eprintln!("Error: {}", e),
         }
 

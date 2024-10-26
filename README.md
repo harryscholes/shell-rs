@@ -13,7 +13,7 @@ A shell implementation in Rust.
 - [x] Redirection
 - [x] Pipes
 - [x] AND and OR
-- [ ] Background
+- [x] Background
 - [ ] Variables
 - [ ] Variable substitution
 - [ ] Command substitution

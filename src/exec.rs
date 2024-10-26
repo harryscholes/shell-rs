@@ -6,8 +6,36 @@ use std::{
 
 use crate::{ast::Ast, grammar::Token};
 
-pub fn execute(ast: &Ast) -> io::Result<ExitStatus> {
-    exec_impl(ast, None, None)?.wait()
+pub enum RunningProcess {
+    Background,
+    Foreground(ExitStatus),
+}
+
+impl RunningProcess {
+    pub fn success(&self) -> bool {
+        match self {
+            RunningProcess::Background => true,
+            RunningProcess::Foreground(status) => status.success(),
+        }
+    }
+}
+
+pub fn execute(ast: &Ast) -> io::Result<RunningProcess> {
+    match ast {
+        Ast::Background { inner } => {
+            let inner = inner.clone();
+            std::thread::spawn(move || {
+                let mut child = exec_impl(&inner, None, None)?;
+                child.wait()
+            });
+            Ok(RunningProcess::Background)
+        }
+        _ => {
+            let mut child = exec_impl(ast, None, None)?;
+            let status = child.wait()?;
+            Ok(RunningProcess::Foreground(status))
+        }
+    }
 }
 
 fn exec_impl(ast: &Ast, stdin: Option<Stdio>, stdout: Option<Stdio>) -> io::Result<Child> {

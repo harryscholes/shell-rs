@@ -1,6 +1,6 @@
 use crate::grammar::Token;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Ast {
     Command { command: Token, args: Vec<Token> },
     Pipe { left: Box<Ast>, right: Box<Ast> },

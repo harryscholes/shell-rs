@@ -1,11 +1,15 @@
-use std::{io, process::ExitStatus};
+use std::io;
 
-use crate::{exec::execute, lex::Lexer, parse::Parser};
+use crate::{
+    exec::{execute, RunningProcess},
+    lex::Lexer,
+    parse::Parser,
+};
 
 pub struct Pipeline;
 
 impl Pipeline {
-    pub fn run(input: &str) -> io::Result<ExitStatus> {
+    pub fn run(input: &str) -> io::Result<RunningProcess> {
         let tokens = Lexer::lex(input)?;
         let ast = Parser::parse(&tokens)?;
         execute(&ast)
