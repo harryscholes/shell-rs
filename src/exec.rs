@@ -88,7 +88,8 @@ fn exec_or(left: &Ast, right: &Ast, stdout: Option<Stdio>) -> io::Result<Child> 
 }
 
 fn exec_sequence(left: &Ast, right: &Ast, stdout: Option<Stdio>) -> io::Result<Child> {
-    exec_impl(left, None, None)?;
+    let mut child = exec_impl(left, None, None)?;
+    _ = child.wait();
     exec_impl(right, None, stdout)
 }
 
@@ -245,6 +246,49 @@ mod tests {
         let left = Ast::Command {
             command: input!("echo"),
             args: vec![input!("foo")],
+        };
+        let right = Ast::Command {
+            command: input!("echo"),
+            args: vec![input!("bar")],
+        };
+        let stdout = Stdio::piped();
+        let child = exec_sequence(&left, &right, Some(stdout)).unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert_eq!(std::str::from_utf8(&output.stdout).unwrap(), "bar\n");
+    }
+
+    #[test]
+    fn test_exec_sequence_left_executed_before_right() {
+        let dir = TempDir::new("").unwrap();
+        let path = dir.path().join("output.txt");
+        let left = Ast::RedirectOut {
+            left: Box::new(Ast::Command {
+                command: input!("echo"),
+                args: vec![input!("foo")],
+            }),
+            right: input!(path.to_str().unwrap()),
+        };
+        let right = Ast::RedirectAppend {
+            left: Box::new(Ast::Command {
+                command: input!("echo"),
+                args: vec![input!("bar")],
+            }),
+            right: input!(path.to_str().unwrap()),
+        };
+        exec_sequence(&left, &right, None).unwrap().wait().unwrap();
+        let mut result = String::new();
+        File::open(&path)
+            .unwrap()
+            .read_to_string(&mut result)
+            .unwrap();
+        assert_eq!(&result, "foo\nbar\n");
+    }
+
+    #[test]
+    fn test_exec_sequence_left_error() {
+        let left = Ast::Command {
+            command: input!("false"),
+            args: vec![],
         };
         let right = Ast::Command {
             command: input!("echo"),
