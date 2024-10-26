@@ -7,8 +7,7 @@ pub struct Pipeline;
 impl Pipeline {
     pub fn run(input: &str) -> io::Result<ExitStatus> {
         let tokens = Lexer::lex(input)?;
-        let ast = Parser::parse(&tokens)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "parse error"))?;
+        let ast = Parser::parse(&tokens)?;
         execute(&ast)
     }
 }
@@ -70,21 +69,21 @@ mod tests {
         assert_eq!(&result, "foo\n");
     }
 
-    // #[test]
-    // fn test_nested_subshells() {
-    //     let dir = TempDir::new("").unwrap();
-    //     let path = dir.path().join("output.txt");
-    //     let input = format!(
-    //         "((( echo foo | cat ) | cat ) | cat ) | cat > {}",
-    //         path.to_str().unwrap()
-    //     );
-    //     let status = Pipeline::run(&input).unwrap();
-    //     assert!(status.success());
-    //     let mut result = String::new();
-    //     File::open(&path)
-    //         .unwrap()
-    //         .read_to_string(&mut result)
-    //         .unwrap();
-    //     assert_eq!(&result, "foo\n");
-    // }
+    #[test]
+    fn test_nested_subshells() {
+        let dir = TempDir::new("").unwrap();
+        let path = dir.path().join("output.txt");
+        let input = format!(
+            "((( echo foo | cat ) | cat ) | cat ) | cat > {}",
+            path.to_str().unwrap()
+        );
+        let status = Pipeline::run(&input).unwrap();
+        assert!(status.success());
+        let mut result = String::new();
+        File::open(&path)
+            .unwrap()
+            .read_to_string(&mut result)
+            .unwrap();
+        assert_eq!(&result, "foo\n");
+    }
 }

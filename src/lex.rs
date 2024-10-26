@@ -1,11 +1,9 @@
-use std::io;
-
-use crate::{grammar::Token, input};
+use crate::{error::Error, grammar::Token, input};
 
 pub struct Lexer;
 
 impl Lexer {
-    pub fn lex(line: &str) -> io::Result<Vec<Token>> {
+    pub fn lex(line: &str) -> Result<Vec<Token>, Error> {
         let mut tokens = vec![];
         let mut token = String::new();
         let mut escape = false;
@@ -46,10 +44,7 @@ impl Lexer {
                 if iter.peek() == Some(&'|') {
                     iter.next();
                     if iter.peek() == Some(&'|') {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "parse error near `|`",
-                        ));
+                        Err(Error::Parse(Token::Pipe))?;
                     }
                     tokens.push(Token::Or);
                 } else {
@@ -62,10 +57,7 @@ impl Lexer {
                 if iter.peek() == Some(&'>') {
                     iter.next();
                     if iter.peek() == Some(&'>') {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "parse error near `>`",
-                        ));
+                        Err(Error::Parse(Token::RedirectAppend))?;
                     }
                     tokens.push(Token::RedirectAppend);
                 } else {
@@ -78,10 +70,7 @@ impl Lexer {
                 if iter.peek() == Some(&'&') {
                     iter.next();
                     if iter.peek() == Some(&'&') {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "parse error near `&`",
-                        ));
+                        Err(Error::Parse(Token::Background))?;
                     }
                     tokens.push(Token::And);
                 } else {

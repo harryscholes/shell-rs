@@ -1,9 +1,9 @@
-use crate::{ast::Ast, grammar::Token, lex::is_operator};
+use crate::{ast::Ast, error::Error, grammar::Token, lex::is_operator};
 
 pub struct Parser;
 
 impl Parser {
-    pub fn parse(tokens: &[Token]) -> Option<Ast> {
+    pub fn parse(tokens: &[Token]) -> Result<Ast, Error> {
         let mut i = 0;
         let mut nodes = vec![];
 
@@ -12,7 +12,7 @@ impl Parser {
 
             match token {
                 Token::Pipe => {
-                    let left = nodes.pop()?;
+                    let left = nodes.pop().ok_or(Error::Parse(Token::Pipe))?;
                     let command = parse_command(&tokens[i + 1..]);
                     i += command.args.len() + 1;
                     nodes.push(Ast::Pipe {
@@ -21,7 +21,7 @@ impl Parser {
                     });
                 }
                 Token::RedirectOut => {
-                    let left = nodes.pop()?;
+                    let left = nodes.pop().ok_or(Error::Parse(Token::RedirectOut))?;
                     let right = tokens[i + 1].clone();
                     i += 1;
                     nodes.push(Ast::RedirectOut {
@@ -30,7 +30,7 @@ impl Parser {
                     });
                 }
                 Token::RedirectAppend => {
-                    let left = nodes.pop()?;
+                    let left = nodes.pop().ok_or(Error::Parse(Token::RedirectAppend))?;
                     let right = tokens[i + 1].clone();
                     i += 1;
                     nodes.push(Ast::RedirectAppend {
@@ -39,7 +39,7 @@ impl Parser {
                     });
                 }
                 Token::And => {
-                    let left = nodes.pop()?;
+                    let left = nodes.pop().ok_or(Error::Parse(Token::And))?;
                     let command = parse_command(&tokens[i + 1..]);
                     i += command.args.len() + 1;
                     nodes.push(Ast::And {
@@ -48,7 +48,7 @@ impl Parser {
                     });
                 }
                 Token::Or => {
-                    let left = nodes.pop()?;
+                    let left = nodes.pop().ok_or(Error::Parse(Token::Or))?;
                     let command = parse_command(&tokens[i + 1..]);
                     i += command.args.len() + 1;
                     nodes.push(Ast::Or {
@@ -57,7 +57,7 @@ impl Parser {
                     });
                 }
                 Token::End => {
-                    let left = nodes.pop()?;
+                    let left = nodes.pop().ok_or(Error::Parse(Token::End))?;
                     let right_tokens = &tokens[i + 1..];
                     if right_tokens.is_empty() {
                         nodes.push(Ast::Sequence {
@@ -75,16 +75,14 @@ impl Parser {
                 }
                 Token::OpenParenthesis => {
                     let (subshell, l) = Self::parse_subshell(&tokens[i + 1..]);
+                    let subshell = subshell?;
                     i += l + 1;
-                    if let Some(subshell) = subshell {
-                        nodes.push(Ast::Subshell {
-                            inner: Box::new(subshell),
-                        });
-                    }
+                    nodes.push(Ast::Subshell {
+                        inner: Box::new(subshell),
+                    });
                 }
                 Token::CloseParenthesis => {
-                    i += 1;
-                    break;
+                    Err(Error::Parse(Token::CloseParenthesis))?;
                 }
                 t if !is_operator(t) => {
                     let command = parse_command(&tokens[i..]);
@@ -99,10 +97,10 @@ impl Parser {
             i += 1;
         }
 
-        nodes.pop()
+        nodes.pop().ok_or(Error::Parse(Token::End))
     }
 
-    fn parse_subshell(tokens: &[Token]) -> (Option<Ast>, usize) {
+    fn parse_subshell(tokens: &[Token]) -> (Result<Ast, Error>, usize) {
         let mut inner_tokens = vec![];
         let mut paren_level = 1;
 
@@ -178,27 +176,19 @@ mod tests {
             input!("main"),
         ];
         let ast = Parser::parse(&tokens).unwrap();
-
-        match ast {
-            Ast::Pipe { left, right } => {
-                match *left {
-                    Ast::Command { command, args } => {
-                        assert_eq!(command, input!("ls"));
-                        assert_eq!(args, vec![input!("-l")]);
-                    }
-                    _ => panic!("Expected Command"),
-                }
-
-                match *right {
-                    Ast::Command { command, args } => {
-                        assert_eq!(command, input!("grep"));
-                        assert_eq!(args, vec![input!("main")]);
-                    }
-                    _ => panic!("Expected Command"),
-                }
+        assert_eq!(
+            ast,
+            Ast::Pipe {
+                left: Box::new(Ast::Command {
+                    command: input!("ls"),
+                    args: vec![input!("-l")],
+                }),
+                right: Box::new(Ast::Command {
+                    command: input!("grep"),
+                    args: vec![input!("main")],
+                }),
             }
-            _ => panic!("Expected Pipe"),
-        }
+        );
     }
 
     #[test]
@@ -211,17 +201,15 @@ mod tests {
             Token::CloseParenthesis,
         ];
         let ast = Parser::parse(&tokens).unwrap();
-
-        match ast {
-            Ast::Subshell { inner } => match *inner {
-                Ast::Command { command, args } => {
-                    assert_eq!(command, input!("echo"));
-                    assert_eq!(args, vec![input!("foo")]);
-                }
-                _ => panic!("Expected Command"),
-            },
-            _ => panic!("Expected Subshell"),
-        }
+        assert_eq!(
+            ast,
+            Ast::Subshell {
+                inner: Box::new(Ast::Command {
+                    command: input!("echo"),
+                    args: vec![input!("foo")],
+                }),
+            }
+        );
 
         // (echo foo;)
         let tokens = vec![
@@ -232,27 +220,18 @@ mod tests {
             Token::CloseParenthesis,
         ];
         let ast = Parser::parse(&tokens).unwrap();
-
-        match ast {
-            Ast::Subshell { inner } => match *inner {
-                Ast::Sequence { left, right } => {
-                    match *left {
-                        Ast::Command { command, args } => {
-                            assert_eq!(command, input!("echo"));
-                            assert_eq!(args, vec![input!("foo")]);
-                        }
-                        _ => panic!("Expected Command"),
-                    };
-
-                    match *right {
-                        Ast::Empty => {}
-                        _ => panic!("Expected Empty"),
-                    }
-                }
-                _ => panic!("Expected Sequence"),
-            },
-            _ => panic!("Expected Subshell"),
-        }
+        assert_eq!(
+            ast,
+            Ast::Subshell {
+                inner: Box::new(Ast::Sequence {
+                    left: Box::new(Ast::Command {
+                        command: input!("echo"),
+                        args: vec![input!("foo")],
+                    }),
+                    right: Box::new(Ast::Empty)
+                }),
+            }
+        );
 
         // (((echo foo)))
         let tokens = vec![
@@ -266,23 +245,19 @@ mod tests {
             Token::CloseParenthesis,
         ];
         let ast = Parser::parse(&tokens).unwrap();
-
-        match ast {
-            Ast::Subshell { inner } => match *inner {
-                Ast::Subshell { inner } => match *inner {
-                    Ast::Subshell { inner } => match *inner {
-                        Ast::Command { command, args } => {
-                            assert_eq!(command, input!("echo"));
-                            assert_eq!(args, vec![input!("foo")]);
-                        }
-                        _ => panic!("Expected Command"),
-                    },
-                    _ => panic!("Expected Subshell"),
-                },
-                _ => panic!("Expected Subshell"),
-            },
-            _ => panic!("Expected Subshell"),
-        }
+        assert_eq!(
+            ast,
+            Ast::Subshell {
+                inner: Box::new(Ast::Subshell {
+                    inner: Box::new(Ast::Subshell {
+                        inner: Box::new(Ast::Command {
+                            command: input!("echo"),
+                            args: vec![input!("foo")],
+                        }),
+                    }),
+                }),
+            }
+        );
 
         // (echo foo | cat)
         let tokens = vec![
@@ -294,29 +269,21 @@ mod tests {
             Token::CloseParenthesis,
         ];
         let ast = Parser::parse(&tokens).unwrap();
-
-        match ast {
-            Ast::Subshell { inner } => match *inner {
-                Ast::Pipe { left, right } => {
-                    match *left {
-                        Ast::Command { command, args } => {
-                            assert_eq!(command, input!("echo"));
-                            assert_eq!(args, vec![input!("foo")]);
-                        }
-                        _ => panic!("Expected Command"),
-                    };
-                    match *right {
-                        Ast::Command { command, args } => {
-                            assert_eq!(command, input!("cat"));
-                            assert_eq!(args, vec![]);
-                        }
-                        _ => panic!("Expected Command"),
-                    };
-                }
-                _ => panic!("Expected Pipe"),
-            },
-            _ => panic!("Expected Subshell"),
-        }
+        assert_eq!(
+            ast,
+            Ast::Subshell {
+                inner: Box::new(Ast::Pipe {
+                    left: Box::new(Ast::Command {
+                        command: input!("echo"),
+                        args: vec![input!("foo")],
+                    }),
+                    right: Box::new(Ast::Command {
+                        command: input!("cat"),
+                        args: vec![],
+                    }),
+                }),
+            }
+        );
 
         // (echo foo | cat) | cat
         let tokens = vec![
@@ -330,41 +297,27 @@ mod tests {
             input!("cat"),
         ];
         let ast = Parser::parse(&tokens).unwrap();
-
-        match ast {
-            Ast::Pipe { left, right } => {
-                match *left {
-                    Ast::Subshell { inner } => match *inner {
-                        Ast::Pipe { left, right } => {
-                            match *left {
-                                Ast::Command { command, args } => {
-                                    assert_eq!(command, input!("echo"));
-                                    assert_eq!(args, vec![input!("foo")]);
-                                }
-                                _ => panic!("Expected Command"),
-                            };
-                            match *right {
-                                Ast::Command { command, args } => {
-                                    assert_eq!(command, input!("cat"));
-                                    assert_eq!(args, vec![]);
-                                }
-                                _ => panic!("Expected Command"),
-                            };
-                        }
-                        _ => panic!("Expected Pipe"),
-                    },
-                    _ => panic!("Expected Subshell"),
-                };
-                match *right {
-                    Ast::Command { command, args } => {
-                        assert_eq!(command, input!("cat"));
-                        assert_eq!(args, vec![]);
-                    }
-                    _ => panic!("Expected Command"),
-                };
+        assert_eq!(
+            ast,
+            Ast::Pipe {
+                left: Box::new(Ast::Subshell {
+                    inner: Box::new(Ast::Pipe {
+                        left: Box::new(Ast::Command {
+                            command: input!("echo"),
+                            args: vec![input!("foo")],
+                        }),
+                        right: Box::new(Ast::Command {
+                            command: input!("cat"),
+                            args: vec![],
+                        }),
+                    }),
+                }),
+                right: Box::new(Ast::Command {
+                    command: input!("cat"),
+                    args: vec![],
+                }),
             }
-            _ => panic!("Expected Pipe"),
-        }
+        );
 
         // ((echo foo | cat) | cat)
         let tokens = vec![
@@ -380,45 +333,29 @@ mod tests {
             Token::CloseParenthesis,
         ];
         let ast = Parser::parse(&tokens).unwrap();
-
-        match ast {
-            Ast::Subshell { inner } => match *inner {
-                Ast::Pipe { left, right } => {
-                    match *left {
-                        Ast::Subshell { inner } => match *inner {
-                            Ast::Pipe { left, right } => {
-                                match *left {
-                                    Ast::Command { command, args } => {
-                                        assert_eq!(command, input!("echo"));
-                                        assert_eq!(args, vec![input!("foo")]);
-                                    }
-                                    _ => panic!("Expected Command"),
-                                };
-                                match *right {
-                                    Ast::Command { command, args } => {
-                                        assert_eq!(command, input!("cat"));
-                                        assert_eq!(args, vec![]);
-                                    }
-                                    _ => panic!("Expected Command"),
-                                };
-                            }
-                            _ => panic!("Expected Pipe"),
-                        },
-                        _ => panic!("Expected Subshell"),
-                    };
-
-                    match *right {
-                        Ast::Command { command, args } => {
-                            assert_eq!(command, input!("cat"));
-                            assert_eq!(args, vec![]);
-                        }
-                        _ => panic!("Expected Command"),
-                    };
-                }
-                _ => panic!("Expected Pipe"),
-            },
-            _ => panic!("Expected Subshell"),
-        }
+        assert_eq!(
+            ast,
+            Ast::Subshell {
+                inner: Box::new(Ast::Pipe {
+                    left: Box::new(Ast::Subshell {
+                        inner: Box::new(Ast::Pipe {
+                            left: Box::new(Ast::Command {
+                                command: input!("echo"),
+                                args: vec![input!("foo")],
+                            }),
+                            right: Box::new(Ast::Command {
+                                command: input!("cat"),
+                                args: vec![],
+                            }),
+                        }),
+                    }),
+                    right: Box::new(Ast::Command {
+                        command: input!("cat"),
+                        args: vec![],
+                    }),
+                }),
+            }
+        );
     }
 
     #[test]
@@ -431,7 +368,8 @@ mod tests {
             Token::CloseParenthesis,
             Token::CloseParenthesis,
         ];
-        assert!(Parser::parse(&tokens).is_none());
+        let ast = Parser::parse(&tokens);
+        assert_eq!(ast, Err(Error::Parse(Token::CloseParenthesis)));
     }
 
     #[test]
@@ -439,23 +377,15 @@ mod tests {
         // echo foo;
         let tokens = vec![input!("echo"), input!("foo"), Token::End];
         let ast = Parser::parse(&tokens).unwrap();
-
-        match ast {
-            Ast::Sequence { left, right } => {
-                match *left {
-                    Ast::Command { command, args } => {
-                        assert_eq!(command, input!("echo"));
-                        assert_eq!(args, vec![input!("foo")]);
-                    }
-                    _ => panic!("Expected Command"),
-                }
-
-                match *right {
-                    Ast::Empty => {}
-                    _ => panic!("Expected Command"),
-                }
+        assert_eq!(
+            ast,
+            Ast::Sequence {
+                left: Box::new(Ast::Command {
+                    command: input!("echo"),
+                    args: vec![input!("foo")],
+                }),
+                right: Box::new(Ast::Empty),
             }
-            _ => panic!("Expected Sequence"),
-        }
+        );
     }
 }

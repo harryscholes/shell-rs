@@ -17,6 +17,12 @@ pub enum Token {
     // - Variable
 }
 
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.as_ref())
+    }
+}
+
 impl AsRef<OsStr> for Token {
     fn as_ref(&self) -> &OsStr {
         match self {
