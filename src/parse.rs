@@ -56,15 +56,10 @@ impl Parser {
                         right: Box::new(command.into()),
                     });
                 }
-                Token::End => {
-                    let left = nodes.pop().ok_or(Error::Parse(Token::End))?;
+                Token::Semicolon => {
                     let right_tokens = &tokens[i + 1..];
-                    if right_tokens.is_empty() {
-                        nodes.push(Ast::Sequence {
-                            left: Box::new(left),
-                            right: Box::new(Ast::Empty),
-                        });
-                    } else {
+                    if !right_tokens.is_empty() {
+                        let left = nodes.pop().ok_or(Error::Parse(Token::Semicolon))?;
                         let command = parse_command(right_tokens);
                         i += command.args.len() + 1;
                         nodes.push(Ast::Sequence {
@@ -84,6 +79,12 @@ impl Parser {
                 Token::CloseParenthesis => {
                     Err(Error::Parse(Token::CloseParenthesis))?;
                 }
+                Token::Background => {
+                    let left = nodes.pop().ok_or(Error::Parse(Token::Background))?;
+                    nodes.push(Ast::Background {
+                        inner: Box::new(left),
+                    });
+                }
                 t if !is_operator(t) => {
                     let command = parse_command(&tokens[i..]);
                     i += command.args.len();
@@ -97,7 +98,7 @@ impl Parser {
             i += 1;
         }
 
-        nodes.pop().ok_or(Error::Parse(Token::End))
+        nodes.pop().ok_or(Error::Parse(Token::Input(String::new())))
     }
 
     fn parse_subshell(tokens: &[Token]) -> (Result<Ast, Error>, usize) {
@@ -216,19 +217,16 @@ mod tests {
             Token::OpenParenthesis,
             input!("echo"),
             input!("foo"),
-            Token::End,
+            Token::Semicolon,
             Token::CloseParenthesis,
         ];
         let ast = Parser::parse(&tokens).unwrap();
         assert_eq!(
             ast,
             Ast::Subshell {
-                inner: Box::new(Ast::Sequence {
-                    left: Box::new(Ast::Command {
-                        command: input!("echo"),
-                        args: vec![input!("foo")],
-                    }),
-                    right: Box::new(Ast::Empty)
+                inner: Box::new(Ast::Command {
+                    command: input!("echo"),
+                    args: vec![input!("foo")],
                 }),
             }
         );
@@ -373,9 +371,26 @@ mod tests {
     }
 
     #[test]
-    fn test_end() {
+    fn test_semicolon() {
         // echo foo;
-        let tokens = vec![input!("echo"), input!("foo"), Token::End];
+        let tokens = vec![input!("echo"), input!("foo"), Token::Semicolon];
+        let ast = Parser::parse(&tokens).unwrap();
+        assert_eq!(
+            ast,
+            Ast::Command {
+                command: input!("echo"),
+                args: vec![input!("foo")],
+            }
+        );
+
+        // echo foo; echo bar
+        let tokens = vec![
+            input!("echo"),
+            input!("foo"),
+            Token::Semicolon,
+            input!("echo"),
+            input!("bar"),
+        ];
         let ast = Parser::parse(&tokens).unwrap();
         assert_eq!(
             ast,
@@ -384,7 +399,34 @@ mod tests {
                     command: input!("echo"),
                     args: vec![input!("foo")],
                 }),
-                right: Box::new(Ast::Empty),
+                right: Box::new(Ast::Command {
+                    command: input!("echo"),
+                    args: vec![input!("bar")],
+                }),
+            }
+        );
+
+        // echo foo; echo bar;
+        let tokens = vec![
+            input!("echo"),
+            input!("foo"),
+            Token::Semicolon,
+            input!("echo"),
+            input!("bar"),
+            Token::Semicolon,
+        ];
+        let ast = Parser::parse(&tokens).unwrap();
+        assert_eq!(
+            ast,
+            Ast::Sequence {
+                left: Box::new(Ast::Command {
+                    command: input!("echo"),
+                    args: vec![input!("foo")],
+                }),
+                right: Box::new(Ast::Command {
+                    command: input!("echo"),
+                    args: vec![input!("bar")],
+                }),
             }
         );
     }

@@ -1,4 +1,7 @@
-use std::io::{self, BufRead, Write};
+use std::{
+    f32::consts::E,
+    io::{self, BufRead, Write},
+};
 
 use shell::pipeline::Pipeline;
 
@@ -11,8 +14,13 @@ fn main() {
 
         io::stdin().lock().read_line(&mut line).unwrap();
 
-        if let Err(e) = Pipeline::run(line.trim()) {
-            eprintln!("Error: {}", e);
+        match Pipeline::run(line.trim()) {
+            Ok(status) => {
+                if !status.success() {
+                    eprintln!("Exit status code: {:?}", status.code());
+                }
+            }
+            Err(e) => eprintln!("Error: {}", e),
         }
 
         line.clear();

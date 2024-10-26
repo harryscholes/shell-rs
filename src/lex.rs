@@ -36,7 +36,7 @@ impl Lexer {
                 if !token.is_empty() {
                     tokens.push(input!(std::mem::take(&mut token)));
                 }
-                tokens.push(Token::End);
+                tokens.push(Token::Semicolon);
             } else if c == '|' && !in_single_quotes && !in_double_quotes {
                 if !token.is_empty() {
                     tokens.push(input!(std::mem::take(&mut token)));
@@ -144,7 +144,7 @@ mod tests {
 
         let line = ";";
         let tokens = Lexer::lex(line).unwrap();
-        assert_eq!(tokens, vec![Token::End]);
+        assert_eq!(tokens, vec![Token::Semicolon]);
     }
 
     #[test]

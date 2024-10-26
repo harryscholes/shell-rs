@@ -10,7 +10,7 @@ pub enum Token {
     Background,
     And,
     Or,
-    End,
+    Semicolon,
     OpenParenthesis,
     CloseParenthesis,
     // TODO:
@@ -34,7 +34,7 @@ impl AsRef<OsStr> for Token {
             Token::And => "&&".as_ref(),
             Token::Or => "||".as_ref(),
             Token::Background => "&".as_ref(),
-            Token::End => ";".as_ref(),
+            Token::Semicolon => ";".as_ref(),
             Token::OpenParenthesis => "(".as_ref(),
             Token::CloseParenthesis => ")".as_ref(),
         }

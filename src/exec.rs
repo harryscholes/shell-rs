@@ -20,7 +20,7 @@ fn exec_impl(ast: &Ast, stdin: Option<Stdio>, stdout: Option<Stdio>) -> io::Resu
         Ast::Or { left, right } => exec_or(left, right, stdout),
         Ast::Sequence { left, right } => exec_sequence(left, right, stdout),
         Ast::Subshell { inner } => exec_impl(inner, stdin, stdout),
-        Ast::Empty => Ok(Command::new("true").spawn()?),
+        Ast::Background { inner } => exec_impl(inner, stdin, stdout), // TODO
     }
 }
 
